@@ -1,6 +1,7 @@
 setup.py
 app/__init__.py
 app/main.py
+scripts/create_db.py
 testApi.egg-info/PKG-INFO
 testApi.egg-info/SOURCES.txt
 testApi.egg-info/dependency_links.txt
