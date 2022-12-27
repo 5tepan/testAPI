@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
 import uuid
+from starlette import status
 
-
-from app.forms import UserLoginForm
+from app.forms import UserLoginForm, UserCreateForm
 from app.models import connect_db, User, AuthToken
 from app.utils import get_password_hash
-
+from app.auth import check_auth_token
 
 router = APIRouter()
 
@@ -19,7 +19,28 @@ def login(user_form: UserLoginForm = Body(..., embed=True), db=Depends(connect_d
     auth_token = AuthToken(token=str(uuid.uuid4()), user_id=user.id)
     db.add(auth_token)
     db.commit()
-    return {'status': 'OK'}
+    return {'auth_token': auth_token.token}
 
 
-#def create_user(user: UserCreateForm = Body(..., embed=True), db=Depends(connect_db)):
+@router.post('/user', name='user:create')
+def create_user(user: UserCreateForm = Body(..., embed=True), db=Depends(connect_db)):
+    exist_user = db.query(User.id).filter(User.email == user.email).one_or_none()
+    if exist_user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Email already exists!')
+
+    new_user = User(
+        email=user.email,
+        password=get_password_hash(user.password),
+        first_name=user.first_name,
+        last_name=user.last_name,
+        nickname=user.nickname,
+    )
+    db.add(new_user)
+    db.commit()
+    return {'user_id': new_user.id}
+
+
+@router.get('/user', name='user:get')
+def get_user(token: AuthToken = Depends(check_auth_token), db=Depends(connect_db)):
+    user = db.query(User).filter(User.id == token.user_id).one_or_none()
+    return {'id': user.id, 'email': user.email, 'nickname': user.nickname}
